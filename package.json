@@ -1,0 +1,18 @@
+{
+  "name": "@culur/bash",
+  "version": "0.0.0",
+  "keywords": [],
+  "author": "culur <culur.net@gmail.com>",
+  "license": "MIT",
+  "scripts": {},
+  "packageManager": "pnpm@10.34.5",
+  "volta": {
+    "node": "22.20.0",
+    "pnpm": "10.18.2"
+  },
+  "devDependencies": {
+    "@culur/config-prettier": "^1.4.1",
+    "prettier": "^3.9.5",
+    "prettier-plugin-sh": "^0.19.0"
+  }
+}
