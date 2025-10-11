@@ -1,0 +1,26 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "scriptArgs",
+      "type": "promptString",
+      "description": "Enter arguments for the script (space-separated)",
+      "default": ""
+    }
+  ],
+  "configurations": [
+    {
+      "type": "bashdb",
+      "request": "launch",
+      "name": "Bash-Debug (select script from list of sh files)",
+      "cwd": "${workspaceFolder}",
+      "program": "${command:SelectScriptName}",
+      "args": ["${input:scriptArgs}"],
+      "terminalKind": "integrated",
+      "pathBash": "/opt/homebrew/bin/bash"
+    }
+  ]
+}
