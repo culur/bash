@@ -193,9 +193,9 @@ echo "Starting rebase to move commit(s)..."
 export PYTHON_SCRIPT=$(cat << 'PYEOF'
 import sys, subprocess
 
-todo_file = sys.argv[1]
-selected_hashes = sys.argv[2].split()
-target_hash = sys.argv[3].strip()
+selected_hashes = sys.argv[1].split()
+target_hash = sys.argv[2].strip()
+todo_file = sys.argv[3]
 
 def get_full_hash(short_hash):
     try:
