@@ -190,7 +190,10 @@ fi
 
 echo "Starting rebase to move commit(s)..."
 
-export PYTHON_SCRIPT=$(cat << 'PYEOF'
+tmp_editor=$(mktemp)
+trap 'rm -f "$tmp_editor"' EXIT
+
+cat << 'PYEOF' > "$tmp_editor"
 import sys, subprocess
 
 selected_hashes = sys.argv[1].split()
@@ -248,9 +251,8 @@ new_lines.extend(other_lines)
 with open(todo_file, "w", encoding="utf-8") as f:
     f.writelines(new_lines)
 PYEOF
-)
 
-export GIT_SEQUENCE_EDITOR="python3 -c \"\$PYTHON_SCRIPT\" \"${ordered_selected_hashes[*]}\" \"$target_hash\""
+export GIT_SEQUENCE_EDITOR="python3 '$tmp_editor' '${ordered_selected_hashes[*]}' '$target_hash'"
 
 if ! git rebase -i "${rebase_base}" > /dev/null 2>&1; then
   git rebase --abort > /dev/null 2>&1 || true
