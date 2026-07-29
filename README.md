@@ -147,9 +147,60 @@ Interactively generate and initialize `.gitattributes` and `.gitignore` files fo
   git init-config --help
   ```
 
-### 5. `agy-usage`
+### 5. `ai-usage`
 
-An interactive visualizer for Google Antigravity CLI (`agy`) usage and quota metrics, leveraging headless PTY screen capture to parse TUI output with 0 LLM token cost and 0 API risk.
+An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI usage and quota metrics in real-time. **Currently, this command only supports the Google Antigravity CLI (`agy`).**
+
+- **Options:**
+  - _(None at the moment, just run `ai-usage`)_
+
+- **How it works:**
+  1. **Headless Terminal Emulation:** Spawns a background `tmux` session to run the `agy` CLI invisibly.
+  2. **Automated Data Extraction:** Continuously monitors the startup screen to parse your account profile and then automatically triggers the `/usage` command.
+  3. **Rich Terminal Visuals:** Parses the usage data into a fully interactive TUI with progress bars, dynamic color-coding, and quota pacing analysis (elapsed time vs. consumed quota).
+  4. **Interactive Controls:**
+     - Use `[tab]` to switch between Model Groups (e.g., GEMINI MODELS vs CLAUDE AND GPT MODELS).
+     - Use `[f]` to toggle the visibility of the Five-Hour Limit metrics.
+     - Use `[r]` or `[enter]` to trigger a live background refresh without leaving the TUI.
+     - Use `[esc]` to cleanly exit the session.
+
+- **Examples:**
+
+  ```bash
+  # Launch the interactive AI Usage dashboard
+  ai-usage
+  ```
+
+- **Example Output:**
+
+  ```text
+  Antigravity Usage CLI
+
+  Antigravity CLI 1.1.8
+  email@gmail.com (Google AI Pro)
+
+  GEMINI MODELS (13.33%) | CLAUDE AND GPT MODELS (100.00%)
+    Models within this group: Gemini Flash, Gemini Pro
+
+    Weekly Limit
+    [███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 13.80%
+      14% remaining · Refreshes in 57m
+
+    Weekly Remaining
+    [███████████████████████████████████████████░░░░░░░] 87.50%
+    Passed: 167h (6d 23h) · Remaining: 0h 43m
+    You are using tokens 12.90% slower than time elapsed (keep going!)
+
+  ────────────────────────────────────────────────────────────────────────────────
+  [tab] Switch Group · [f] Toggle 5-Hour Limit
+  [r] or [enter] Refresh · [esc] Exit
+  ```
+
+### 6. `agy-usage` (Maintain Only / Deprecated)
+
+_(Note: This is the legacy one-shot print command. It is currently in maintain-only mode and may be removed in the future. Please use `ai-usage` instead for the full interactive experience.)_
+
+An automated script for Google Antigravity CLI (`agy`) usage metrics, leveraging headless PTY screen capture to parse TUI output with 0 LLM token cost and 0 API risk.
 
 - **Options:**
   - `--mock`: Run in mock mode with sample data to test visual rendering without invoking `tmux` or `agy`.
