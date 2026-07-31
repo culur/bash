@@ -426,8 +426,9 @@ def render_tui(all_metrics, header_info, current_group, show_five_hour, status="
     out.append(
         f"{C_CYAN}[r]{C_RESET} or {C_CYAN}[enter]{C_RESET} Refresh · {C_CYAN}[esc]{C_RESET} Exit"
     )
+    out.append("")
     if status:
-        out.append(f"{C_CYAN}{status}{C_RESET}")
+        out.append(status)
     else:
         out.append("")  # padding
 
@@ -435,22 +436,30 @@ def render_tui(all_metrics, header_info, current_group, show_five_hour, status="
     sys.stdout.flush()
 
 
-def spinner_wait(message, condition_func=None, timeout=5.0, check_interval=0.1):
+def spinner_wait(
+    message, condition_func=None, timeout=5.0, check_interval=0.1, render_func=None
+):
     spinner = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
     start = time.time()
     sys.stdout.write("\033[?25l")  # hide cursor
     while time.time() - start < timeout:
+        spin_char = next(spinner)
         if condition_func:
             res = condition_func()
             if res:
-                sys.stdout.write("\r\033[K")  # clear line
-                sys.stdout.flush()
+                if render_func is None:
+                    sys.stdout.write("\r\033[K")
+                    sys.stdout.flush()
                 return res
-        sys.stdout.write(f"\r{C_CYAN}{next(spinner)}{C_RESET} {message}")
-        sys.stdout.flush()
+        if render_func:
+            render_func(spin_char)
+        else:
+            sys.stdout.write(f"\r{C_CYAN}{spin_char}{C_RESET} {message}")
+            sys.stdout.flush()
         time.sleep(check_interval)
-    sys.stdout.write("\r\033[K")
-    sys.stdout.flush()
+    if render_func is None:
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
     return None
 
 
@@ -504,13 +513,24 @@ def main():
     try:
         tty.setcbreak(fd)
 
+        all_metrics = {}
+        current_group = "GEMINI MODELS"
+        show_five_hour = False
+
         def refresh_data(is_initial=False):
-            msg = "Querying /usage..." if is_initial else "Refreshing..."
+            def do_render(spin_char):
+                render_tui(
+                    all_metrics,
+                    header_info,
+                    current_group,
+                    show_five_hour,
+                    status=f"{C_CYAN}{spin_char} Refreshing...{C_RESET}",
+                )
 
             tmux_send_keys("Escape")
-            spinner_wait(msg, timeout=1.0)
+            spinner_wait("Refreshing...", timeout=0.5, render_func=do_render)
             tmux_send_keys("'/usage' Enter")
-            spinner_wait(msg, timeout=1.0)
+            spinner_wait("Refreshing...", timeout=0.5, render_func=do_render)
 
             def check_usage():
                 text = tmux_capture()
@@ -518,7 +538,9 @@ def main():
                     return text
                 return None
 
-            text = spinner_wait(msg, check_usage, timeout=10.0)
+            text = spinner_wait(
+                "Refreshing...", check_usage, timeout=10.0, render_func=do_render
+            )
             if not text:
                 text = tmux_capture()
 
@@ -528,12 +550,43 @@ def main():
         all_metrics = refresh_data(is_initial=True)
 
         esc_pending = False
-        current_group = "GEMINI MODELS"
-        show_five_hour = False
-
-        render_tui(all_metrics, header_info, current_group, show_five_hour)
+        countdown_start = time.time()
+        last_rem_sec = -1
 
         while True:
+            elapsed = time.time() - countdown_start
+            rem_sec = max(0, 60 - int(elapsed))
+
+            if rem_sec == 0:
+                esc_pending = False
+                all_metrics = refresh_data(is_initial=False)
+                countdown_start = time.time()
+                last_rem_sec = -1
+                render_tui(
+                    all_metrics,
+                    header_info,
+                    current_group,
+                    show_five_hour,
+                    status=f"{C_DIM}⠿ Pending (60s){C_RESET}",
+                )
+                continue
+
+            status_str = (
+                f"{C_DIM}⠿ Pending ({rem_sec}s){C_RESET} {C_RED}(Press Esc again to exit){C_RESET}"
+                if esc_pending
+                else f"{C_DIM}⠿ Pending ({rem_sec}s){C_RESET}"
+            )
+
+            if rem_sec != last_rem_sec:
+                last_rem_sec = rem_sec
+                render_tui(
+                    all_metrics,
+                    header_info,
+                    current_group,
+                    show_five_hour,
+                    status=status_str,
+                )
+
             r, _, _ = select.select([sys.stdin], [], [], 0.1)
             if r:
                 ch = sys.stdin.read(1)
@@ -545,22 +598,14 @@ def main():
                         if r_sub2:
                             sys.stdin.read(1)
                         esc_pending = False
-                        render_tui(
-                            all_metrics, header_info, current_group, show_five_hour
-                        )
+                        last_rem_sec = -1
                         continue
 
                     if esc_pending:
                         break  # Exit
                     else:
                         esc_pending = True
-                        render_tui(
-                            all_metrics,
-                            header_info,
-                            current_group,
-                            show_five_hour,
-                            status="Press Esc again to exit",
-                        )
+                        last_rem_sec = -1
                         continue
                 elif ch == "\t":
                     current_group = (
@@ -569,23 +614,30 @@ def main():
                         else "GEMINI MODELS"
                     )
                     esc_pending = False
-                    render_tui(all_metrics, header_info, current_group, show_five_hour)
+                    last_rem_sec = -1
                     continue
                 elif ch.lower() == "f":
                     show_five_hour = not show_five_hour
                     esc_pending = False
-                    render_tui(all_metrics, header_info, current_group, show_five_hour)
+                    last_rem_sec = -1
                     continue
                 elif ch.lower() == "r" or ch in ("\n", "\r"):
                     esc_pending = False
                     all_metrics = refresh_data(is_initial=False)
-                    render_tui(all_metrics, header_info, current_group, show_five_hour)
+                    countdown_start = time.time()
+                    last_rem_sec = -1
+                    render_tui(
+                        all_metrics,
+                        header_info,
+                        current_group,
+                        show_five_hour,
+                        status=f"{C_DIM}⠿ Pending (60s){C_RESET}",
+                    )
                     continue
                 else:
                     esc_pending = False
-                    render_tui(all_metrics, header_info, current_group, show_five_hour)
-            else:
-                pass
+                    last_rem_sec = -1
+                    continue
 
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
