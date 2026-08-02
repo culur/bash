@@ -156,12 +156,13 @@ An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI us
 
 - **How it works:**
   1. **Headless Terminal Emulation:** Spawns a background `tmux` session to run the `agy` CLI invisibly.
-  2. **Automated Data Extraction:** Continuously monitors the startup screen to parse your account profile and then automatically triggers the `/usage` command.
-  3. **Rich Terminal Visuals:** Parses the usage data into a fully interactive TUI with progress bars, dynamic color-coding, and quota pacing analysis (elapsed time vs. consumed quota).
-  4. **Interactive Controls:**
-     - Use `[tab]` to switch between Model Groups (e.g., GEMINI MODELS vs CLAUDE AND GPT MODELS).
+  2. **Automated Data Extraction:** Continuously monitors the startup screen to parse your account profile and automatically triggers the initial `/usage` command.
+  3. **Event-Driven History Tracking:** Monitors `~/.gemini/antigravity-cli/history.jsonl` for new token-consuming AI prompts (filtering by `conversationId` and excluding non-token slash commands like `/usage` or `/model`) to trigger live quota updates automatically without background command spamming.
+  4. **Dynamic Local Time Delta Calculations:** Recalculates elapsed time, remaining quota countdowns, and pacing differentials (`% token used` vs `% time passed`) locally every second using high-precision local clock deltas, providing a smooth real-time TUI update.
+  5. **Instant Non-Blocking Controls (0ms delay):** Uses OS I/O multiplexing (`select.select`) to instantly handle user input.
+     - Use `[tab]` to switch between Model Groups (e.g., `GEMINI MODELS` vs `CLAUDE AND GPT MODELS`).
      - Use `[f]` to toggle the visibility of the Five-Hour Limit metrics.
-     - Use `[r]` or `[enter]` to trigger a live background refresh without leaving the TUI.
+     - Use `[r]` or `[enter]` to trigger a live manual background refresh instantly.
      - Use `[esc]` to cleanly exit the session.
 
 - **Examples:**

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import atexit
 import itertools
+import json
 import os
 import re
 import select
@@ -14,6 +15,7 @@ import tty
 PID = os.getpid()
 TMUX_SESSION = f"ai_usage_{PID}"
 TMUX_CMD = f"tmux new-session -d -s {TMUX_SESSION} -x 120 -y 40 agy"
+HISTORY_FILE = os.path.expanduser("~/.gemini/antigravity-cli/history.jsonl")
 
 # ANSI Colors
 C_RESET = "\033[0m"
@@ -29,6 +31,41 @@ C_BOLD_GREEN = "\033[1;32m"
 C_BOLD_GRAY = "\033[1;90m"
 C_UNDERLINE = "\033[4m"
 C_CLEAR = "\033[2J\033[H"  # Clear screen and move to top
+
+
+def get_latest_token_prompt_id():
+    """
+    Returns a unique identifier (conversationId + timestamp) for the latest
+    token-consuming prompt in history.jsonl.
+    Ignores slash commands like /usage, /model, /help, etc. which do not consume model tokens.
+    """
+    if not os.path.exists(HISTORY_FILE):
+        return None
+
+    try:
+        with open(HISTORY_FILE, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            read_size = min(size, 8192)
+            f.seek(size - read_size)
+            chunk = f.read().decode("utf-8", errors="ignore")
+            lines = chunk.splitlines()
+
+            for line in reversed(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    if "conversationId" in data and data.get("type") != "slash_command":
+                        cid = data.get("conversationId")
+                        ts = data.get("timestamp")
+                        return f"{cid}_{ts}"
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    continue
+    except (OSError, UnicodeDecodeError):
+        pass
+    return None
 
 
 def cleanup():
@@ -237,6 +274,7 @@ def calculate_metrics_for_group(data):
             "rem_time_pct": rem_time_pct,
             "passed_sec": passed_sec,
             "ref_sec": ref_sec,
+            "initial_ref_sec": ref_sec,
             "pct_diff": pct_diff,
         }
 
@@ -257,10 +295,60 @@ def calculate_metrics_for_group(data):
             "rem_time_pct": rem_time_pct,
             "passed_sec": passed_sec,
             "ref_sec": ref_sec,
+            "initial_ref_sec": ref_sec,
             "pct_diff": pct_diff,
         }
 
     return metrics
+
+
+def recompute_dynamic_metrics(all_metrics, now_time):
+    updated_metrics = {}
+    for group, data in all_metrics.items():
+        group_copy = dict(data)
+        fetch_time = group_copy.get("fetch_time", now_time)
+        delta_sec = max(0, int(now_time - fetch_time))
+
+        if "weekly" in group_copy:
+            w = dict(group_copy["weekly"])
+            initial_ref = w.get("initial_ref_sec", w.get("ref_sec", 0))
+            if initial_ref > 0:
+                total_cycle = 7 * 24 * 3600
+                cur_ref = max(0, initial_ref - delta_sec)
+                cur_passed = max(0, total_cycle - cur_ref)
+                limit_pct = w["limit_pct"]
+                used_pct = 100.0 - limit_pct
+                passed_pct = (cur_passed / total_cycle) * 100.0 if total_cycle else 0
+                rem_time_pct = (cur_ref / total_cycle) * 100.0 if total_cycle else 0
+                pct_diff = used_pct - passed_pct
+
+                w["ref_sec"] = cur_ref
+                w["passed_sec"] = cur_passed
+                w["rem_time_pct"] = rem_time_pct
+                w["pct_diff"] = pct_diff
+            group_copy["weekly"] = w
+
+        if "fiveh" in group_copy:
+            f = dict(group_copy["fiveh"])
+            initial_ref = f.get("initial_ref_sec", f.get("ref_sec", 0))
+            if initial_ref > 0:
+                total_cycle = 5 * 3600
+                cur_ref = max(0, initial_ref - delta_sec)
+                cur_passed = max(0, total_cycle - cur_ref)
+                limit_pct = f["limit_pct"]
+                used_pct = 100.0 - limit_pct
+                passed_pct = (cur_passed / total_cycle) * 100.0 if total_cycle else 0
+                rem_time_pct = (cur_ref / total_cycle) * 100.0 if total_cycle else 0
+                pct_diff = used_pct - passed_pct
+
+                f["ref_sec"] = cur_ref
+                f["passed_sec"] = cur_passed
+                f["rem_time_pct"] = rem_time_pct
+                f["pct_diff"] = pct_diff
+            group_copy["fiveh"] = f
+
+        updated_metrics[group] = group_copy
+    return updated_metrics
 
 
 def render_tui(all_metrics, header_info, current_group, show_five_hour, status=""):
@@ -520,7 +608,7 @@ def main():
         def refresh_data(is_initial=False):
             def do_render(spin_char):
                 render_tui(
-                    all_metrics,
+                    recompute_dynamic_metrics(all_metrics, time.time()),
                     header_info,
                     current_group,
                     show_five_hour,
@@ -545,48 +633,86 @@ def main():
                 text = tmux_capture()
 
             data = parse_all_usage(text)
-            return {k: calculate_metrics_for_group(v) for k, v in data.items()}
+            now_time = time.time()
+            res = {}
+            for k, v in data.items():
+                m = calculate_metrics_for_group(v)
+                m["fetch_time"] = now_time
+                res[k] = m
+            return res
 
         all_metrics = refresh_data(is_initial=True)
+        last_token_prompt_id = get_latest_token_prompt_id()
 
         esc_pending = False
-        countdown_start = time.time()
-        last_rem_sec = -1
+        last_rendered_sec = -1
+        need_rerender = True
 
         while True:
-            elapsed = time.time() - countdown_start
-            rem_sec = max(0, 60 - int(elapsed))
+            now_time = time.time()
+            current_sec = int(now_time)
 
-            if rem_sec == 0:
+            # 1. Check if a new token-consuming prompt occurred in history.jsonl
+            current_token_prompt_id = get_latest_token_prompt_id()
+            if (
+                last_token_prompt_id is not None
+                and current_token_prompt_id is not None
+                and current_token_prompt_id != last_token_prompt_id
+            ):
+                last_token_prompt_id = current_token_prompt_id
                 esc_pending = False
                 all_metrics = refresh_data(is_initial=False)
-                countdown_start = time.time()
-                last_rem_sec = -1
-                render_tui(
-                    all_metrics,
-                    header_info,
-                    current_group,
-                    show_five_hour,
-                    status=f"{C_DIM}⠿ Pending (60s){C_RESET}",
-                )
+                last_rendered_sec = -1
+                need_rerender = True
+                continue
+            elif last_token_prompt_id is None and current_token_prompt_id is not None:
+                last_token_prompt_id = current_token_prompt_id
+
+            # 2. Check if quota reset timer reached 0
+            dynamic_metrics = recompute_dynamic_metrics(all_metrics, now_time)
+            quota_expired = False
+            for g_m in dynamic_metrics.values():
+                for limit_key in ("weekly", "fiveh"):
+                    if limit_key in g_m:
+                        lim = g_m[limit_key]
+                        if (
+                            lim.get("initial_ref_sec", 0) > 0
+                            and lim.get("ref_sec", 0) == 0
+                            and now_time - g_m.get("fetch_time", 0) > 5
+                        ):
+                            quota_expired = True
+                            break
+                if quota_expired:
+                    break
+
+            if quota_expired:
+                esc_pending = False
+                all_metrics = refresh_data(is_initial=False)
+                last_token_prompt_id = get_latest_token_prompt_id()
+                last_rendered_sec = -1
+                need_rerender = True
                 continue
 
-            status_str = (
-                f"{C_DIM}⠿ Pending ({rem_sec}s){C_RESET} {C_RED}(Press Esc again to exit){C_RESET}"
-                if esc_pending
-                else f"{C_DIM}⠿ Pending ({rem_sec}s){C_RESET}"
-            )
+            # 3. Check if second changed or rerender needed
+            if current_sec != last_rendered_sec or need_rerender:
+                last_rendered_sec = current_sec
+                need_rerender = False
 
-            if rem_sec != last_rem_sec:
-                last_rem_sec = rem_sec
+                status_str = (
+                    f"{C_DIM}⠿ Live (watching history.jsonl){C_RESET} {C_RED}(Press Esc again to exit){C_RESET}"
+                    if esc_pending
+                    else f"{C_DIM}⠿ Live (watching history.jsonl){C_RESET}"
+                )
+
                 render_tui(
-                    all_metrics,
+                    dynamic_metrics,
                     header_info,
                     current_group,
                     show_five_hour,
                     status=status_str,
                 )
 
+            # 4. Non-blocking input listen with 0.1s timeout
             r, _, _ = select.select([sys.stdin], [], [], 0.1)
             if r:
                 ch = sys.stdin.read(1)
@@ -598,14 +724,14 @@ def main():
                         if r_sub2:
                             sys.stdin.read(1)
                         esc_pending = False
-                        last_rem_sec = -1
+                        need_rerender = True
                         continue
 
                     if esc_pending:
                         break  # Exit
                     else:
                         esc_pending = True
-                        last_rem_sec = -1
+                        need_rerender = True
                         continue
                 elif ch == "\t":
                     current_group = (
@@ -614,29 +740,23 @@ def main():
                         else "GEMINI MODELS"
                     )
                     esc_pending = False
-                    last_rem_sec = -1
+                    need_rerender = True
                     continue
                 elif ch.lower() == "f":
                     show_five_hour = not show_five_hour
                     esc_pending = False
-                    last_rem_sec = -1
+                    need_rerender = True
                     continue
                 elif ch.lower() == "r" or ch in ("\n", "\r"):
                     esc_pending = False
                     all_metrics = refresh_data(is_initial=False)
-                    countdown_start = time.time()
-                    last_rem_sec = -1
-                    render_tui(
-                        all_metrics,
-                        header_info,
-                        current_group,
-                        show_five_hour,
-                        status=f"{C_DIM}⠿ Pending (60s){C_RESET}",
-                    )
+                    last_token_prompt_id = get_latest_token_prompt_id()
+                    last_rendered_sec = -1
+                    need_rerender = True
                     continue
                 else:
                     esc_pending = False
-                    last_rem_sec = -1
+                    need_rerender = True
                     continue
 
     finally:
