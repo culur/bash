@@ -157,7 +157,9 @@ An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI us
 - **How it works:**
   1. **Headless Terminal Emulation:** Spawns a background `tmux` session to run the `agy` CLI invisibly.
   2. **Automated Data Extraction:** Continuously monitors the startup screen to parse your account profile and automatically triggers the initial `/usage` command.
-  3. **Event-Driven History Tracking:** Monitors `~/.gemini/antigravity-cli/history.jsonl` for new token-consuming AI prompts (filtering by `conversationId` and excluding non-token slash commands like `/usage` or `/model`) to trigger live quota updates automatically without background command spamming.
+  3. **2-Stage Prompt & Response Lifecycle Tracking:**
+     - **Trigger 1 (Prompt Sent):** Monitors `~/.gemini/antigravity-cli/history.jsonl` for new token-consuming AI prompts (filtering by `conversationId` and ignoring non-token slash commands like `/usage` or `/model`) to fetch initial quota metrics when a prompt starts.
+     - **Trigger 2 (Response Completed / Timeout):** Dynamically tracks `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript.jsonl` until the LLM finishes generating (`source: MODEL`, `type: PLANNER_RESPONSE`, `status: DONE`) or hits a 120-second sliding inactivity timeout (reset on any new log activity). Triggers a second `/usage` query to capture exact final token consumption.
   4. **Dynamic Local Time Delta Calculations:** Recalculates elapsed time, remaining quota countdowns, and pacing differentials (`% token used` vs `% time passed`) locally every second using high-precision local clock deltas, providing a smooth real-time TUI update.
   5. **Instant Non-Blocking Controls (0ms delay):** Uses OS I/O multiplexing (`select.select`) to instantly handle user input.
      - Use `[tab]` to switch between Model Groups (e.g., `GEMINI MODELS` vs `CLAUDE AND GPT MODELS`).

@@ -16,6 +16,7 @@ PID = os.getpid()
 TMUX_SESSION = f"ai_usage_{PID}"
 TMUX_CMD = f"tmux new-session -d -s {TMUX_SESSION} -x 120 -y 40 agy"
 HISTORY_FILE = os.path.expanduser("~/.gemini/antigravity-cli/history.jsonl")
+BRAIN_DIR = os.path.expanduser("~/.gemini/antigravity-cli/brain")
 
 # ANSI Colors
 C_RESET = "\033[0m"
@@ -33,14 +34,13 @@ C_UNDERLINE = "\033[4m"
 C_CLEAR = "\033[2J\033[H"  # Clear screen and move to top
 
 
-def get_latest_token_prompt_id():
+def get_latest_token_prompt_info():
     """
-    Returns a unique identifier (conversationId + timestamp) for the latest
-    token-consuming prompt in history.jsonl.
+    Returns (conversationId, timestamp) for the latest token-consuming prompt in history.jsonl.
     Ignores slash commands like /usage, /model, /help, etc. which do not consume model tokens.
     """
     if not os.path.exists(HISTORY_FILE):
-        return None
+        return None, None
 
     try:
         with open(HISTORY_FILE, "rb") as f:
@@ -60,12 +60,119 @@ def get_latest_token_prompt_id():
                     if "conversationId" in data and data.get("type") != "slash_command":
                         cid = data.get("conversationId")
                         ts = data.get("timestamp")
-                        return f"{cid}_{ts}"
-                except (json.JSONDecodeError, TypeError, KeyError):
+                        return cid, ts
+                except (ValueError, TypeError, KeyError):
                     continue
     except (OSError, UnicodeDecodeError):
         pass
+    return None, None
+
+
+def get_latest_token_prompt_id():
+    cid, ts = get_latest_token_prompt_info()
+    if cid and ts:
+        return f"{cid}_{ts}"
     return None
+
+
+def is_model_completed(data: dict) -> bool:
+    if (
+        data.get("source") != "MODEL"
+        or data.get("type") != "PLANNER_RESPONSE"
+        or data.get("status") != "DONE"
+    ):
+        return False
+
+    if data.get("tool_calls"):
+        return False
+
+    if "content" in data and isinstance(data["content"], str):
+        return True
+
+    return "content" not in data and "tool_calls" not in data
+
+
+class TranscriptWatcher:
+    def __init__(self, timeout_sec=120.0):
+        self.timeout_sec = timeout_sec
+        self.active_transcripts = {}
+
+    def track(self, conversation_id):
+        if not conversation_id:
+            return
+
+        transcript_path = os.path.join(
+            BRAIN_DIR, conversation_id, ".system_generated", "logs", "transcript.jsonl"
+        )
+        initial_offset = 0
+        if os.path.exists(transcript_path):
+            try:
+                initial_offset = os.path.getsize(transcript_path)
+            except OSError:
+                initial_offset = 0
+
+        self.active_transcripts[conversation_id] = {
+            "path": transcript_path,
+            "offset": initial_offset,
+            "last_activity": time.time(),
+        }
+
+    def check_completions(self):
+        """
+        Polls active transcripts. Returns True if any conversation
+        completed normally OR timed out (which triggers a second /usage query).
+        """
+        completed = False
+        to_remove = []
+        now = time.time()
+
+        for cid, info in list(self.active_transcripts.items()):
+            path = info["path"]
+            offset = info["offset"]
+
+            if not os.path.exists(path):
+                if now - info["last_activity"] > self.timeout_sec:
+                    to_remove.append(cid)
+                    completed = True
+                continue
+
+            try:
+                cur_size = os.path.getsize(path)
+                if cur_size > offset:
+                    info["last_activity"] = now  # Reset sliding 120s timeout!
+                    with open(path, "rb") as f:
+                        f.seek(offset)
+                        chunk = f.read(cur_size - offset).decode(
+                            "utf-8", errors="ignore"
+                        )
+                        info["offset"] = cur_size
+
+                    lines = chunk.splitlines()
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            if is_model_completed(data):
+                                to_remove.append(cid)
+                                completed = True
+                                break
+                        except (ValueError, TypeError, KeyError):
+                            continue
+            except (OSError, UnicodeDecodeError):
+                pass
+
+            if cid not in to_remove and (
+                now - info["last_activity"] > self.timeout_sec
+            ):
+                to_remove.append(cid)
+                completed = True
+
+        for cid in to_remove:
+            self.active_transcripts.pop(cid, None)
+
+        return completed
 
 
 def cleanup():
@@ -642,7 +749,12 @@ def main():
             return res
 
         all_metrics = refresh_data(is_initial=True)
-        last_token_prompt_id = get_latest_token_prompt_id()
+        watcher = TranscriptWatcher(timeout_sec=120.0)
+
+        cid_init, ts_init = get_latest_token_prompt_info()
+        last_token_prompt_id = (
+            f"{cid_init}_{ts_init}" if (cid_init and ts_init) else None
+        )
 
         esc_pending = False
         last_rendered_sec = -1
@@ -653,13 +765,19 @@ def main():
             current_sec = int(now_time)
 
             # 1. Check if a new token-consuming prompt occurred in history.jsonl
-            current_token_prompt_id = get_latest_token_prompt_id()
+            cid_cur, ts_cur = get_latest_token_prompt_info()
+            current_token_prompt_id = (
+                f"{cid_cur}_{ts_cur}" if (cid_cur and ts_cur) else None
+            )
+
             if (
                 last_token_prompt_id is not None
                 and current_token_prompt_id is not None
                 and current_token_prompt_id != last_token_prompt_id
             ):
                 last_token_prompt_id = current_token_prompt_id
+                if cid_cur:
+                    watcher.track(cid_cur)
                 esc_pending = False
                 all_metrics = refresh_data(is_initial=False)
                 last_rendered_sec = -1
@@ -667,8 +785,18 @@ def main():
                 continue
             elif last_token_prompt_id is None and current_token_prompt_id is not None:
                 last_token_prompt_id = current_token_prompt_id
+                if cid_cur:
+                    watcher.track(cid_cur)
 
-            # 2. Check if quota reset timer reached 0
+            # 2. Check if any active transcript completed or timed out (120s silence)
+            if watcher.check_completions():
+                esc_pending = False
+                all_metrics = refresh_data(is_initial=False)
+                last_rendered_sec = -1
+                need_rerender = True
+                continue
+
+            # 3. Check if quota reset timer reached 0
             dynamic_metrics = recompute_dynamic_metrics(all_metrics, now_time)
             quota_expired = False
             for g_m in dynamic_metrics.values():
@@ -688,7 +816,6 @@ def main():
             if quota_expired:
                 esc_pending = False
                 all_metrics = refresh_data(is_initial=False)
-                last_token_prompt_id = get_latest_token_prompt_id()
                 last_rendered_sec = -1
                 need_rerender = True
                 continue
