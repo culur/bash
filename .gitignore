@@ -31,7 +31,7 @@ nohup.out
 __MACOSX/
 .AppleDouble
 .LSOverride
-Icon?
+# Icon[\r] --- skipped to avoid potential conflicts with the 'icons' directory.
 
 # Resource forks
 ._*
@@ -52,8 +52,7 @@ Icon?
 .file
 .disk_label*
 lost+found
-.HFS+ Private Directory Data[
-]
+.HFS+ Private Directory Data[]
 
 # Directories potentially created on remote AFP share
 .AppleDB

@@ -123,10 +123,16 @@ if [ "$GENERATE_ATTRIBUTES" = true ]; then
 
       gum style --foreground 39 "⬇️  Downloading: ${path}"
 
+      if content=$(curl -sSf "$raw_url"); then
+        :
+      else
+        content="# [Error downloading content]"
+      fi
+
       {
         echo "#! ----- ----- ----- ----- ----- ${lang} ----- ----- ----- ----- ----- !#"
         echo "#? ${blob_url}"
-        curl -sSf "$raw_url" || echo "# [Error downloading content]"
+        echo "$content"
         echo ""
       } >> .gitattributes
     done <<< "$SORTED_SELECTED_ATTR_LANGS"
@@ -210,10 +216,19 @@ if [ "$GENERATE_GITIGNORE" = true ]; then
 
       gum style --foreground 39 "⬇️  Downloading: ${path}"
 
+      if content=$(curl -sSf "$raw_url"); then
+        # Search and replace logic block: handle Icon[\r] pattern
+        pattern=$'Icon\\[\r\\]'
+        replacement=$'# Icon[\\r] --- skipped to avoid potential conflicts with the '\''icons'\'' directory.'
+        content="${content//$pattern/$replacement}"
+      else
+        content="# [Error downloading content]"
+      fi
+
       {
         echo "#! ----- ----- ----- ----- ----- ${lang} ----- ----- ----- ----- ----- !#"
         echo "#? ${blob_url}"
-        curl -sSf "$raw_url" | sed $'s/Icon\\[\r\\]/Icon?/g' || echo "# [Error downloading content]"
+        echo "$content"
         echo ""
       } >> .gitignore
     done <<< "$SORTED_SELECTED_IGNORE_LANGS"
