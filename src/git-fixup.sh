@@ -101,12 +101,21 @@ else
       | gum choose --no-limit --header "Choose file(s) to fix up"
   )
 
+  ESC=$'\033'
+  cleaned_files=()
+  for f in "${selected_files[@]}"; do
+    f_clean=$(printf '%s' "$f" | tr -d '\r' | sed -E "s/${ESC}\[[0-9;]*[a-zA-Z]//g" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    [ -n "$f_clean" ] && cleaned_files+=("$f_clean")
+  done
+  selected_files=("${cleaned_files[@]}")
+
   if [ "${#selected_files[@]}" -eq 0 ]; then
     echo "No files selected." >&2
     exit 1
   fi
 fi
 
+ESC=$'\033'
 selected_display="$(
   printf "%s\n" "${selected_files[@]}" | paste -sd ", " -
 )"
@@ -181,7 +190,7 @@ if [ -z "${commit_line}" ]; then
   exit 1
 fi
 
-commit_hash="$(printf "%s" "${commit_line}" | awk '{print $1}')"
+commit_hash="$(printf "%s" "${commit_line}" | tr -d '\r' | sed -E "s/${ESC}\[[0-9;]*[a-zA-Z]//g" | awk '{print $1}')"
 # commit_subject="$(git show -s --format=%s "${commit_hash}")"
 
 if ! "${use_staged}"; then
@@ -215,7 +224,15 @@ else
 fi
 
 # Run interactive rebase with autosquash and autostash. Avoid opening editor.
-GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash --autostash "${base_ref}"
+if ! GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash --autostash "${base_ref}"; then
+  echo ""
+  gum style --foreground 196 --bold "Error: Interactive rebase failed or encountered conflicts!"
+  echo "Your backup branch is preserved at: ${backup_branch}"
+  echo "To abort the rebase and return to original state, run:"
+  echo "  git rebase --abort"
+  echo "  git reset --hard ${backup_branch}"
+  exit 1
+fi
 
 echo "Rebase completed on branch ${original_branch}."
 
