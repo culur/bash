@@ -175,8 +175,9 @@ if [[ -z "$selection" ]]; then
   exit 0
 fi
 
-# Strip the prefix to get raw file names
-selected_files_raw=$(echo "$selection" | sed 's/^\[.*\] //')
+ESC=$'\033'
+# Strip ANSI escape codes, carriage returns, and status prefix to get raw file names
+selected_files_raw=$(printf '%s\n' "$selection" | tr -d '\r' | sed -E "s/${ESC}\[[0-9;]*[a-zA-Z]//g" | sed -E 's/^\[[^]]*\][[:space:]]*//')
 
 # Calculate accumulated status from base to HEAD for final output
 final_accumulated=$(get_accumulated_changes "${base_commit}" "HEAD")
@@ -184,6 +185,7 @@ final_accumulated=$(get_accumulated_changes "${base_commit}" "HEAD")
 echo "Selected files (with accumulated status up to HEAD):"
 selected_files_array=()
 while IFS= read -r file; do
+  file=$(printf '%s' "$file" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
   [ -z "$file" ] && continue
   selected_files_array+=("$file")
   line=$(echo "$final_accumulated" | awk -v f="$file" 'substr($0, index($0, " ") + 1) == f { print $0; exit }')
@@ -238,11 +240,12 @@ while test -d "$(git rev-parse --git-path rebase-merge 2> /dev/null)"; do
   echo "Processing commit #$commit_index - $current_hash: $current_msg"
 
   for file in "${selected_files_array[@]}"; do
-    if git ls-tree -r HEAD~1 --name-only | grep -qx "$file"; then
+    rm -rf "$file" 2> /dev/null || true
+    if git cat-file -e "HEAD~1:${file}" 2> /dev/null; then
       git checkout HEAD~1 -- "$file" > /dev/null 2>&1 || true
+      git add "$file" > /dev/null 2>&1 || true
     else
-      git rm --cached --ignore-unmatch "$file" > /dev/null 2>&1 || true
-      rm -f "$file"
+      git rm -rf --cached --ignore-unmatch "$file" > /dev/null 2>&1 || true
     fi
   done
 
@@ -295,12 +298,12 @@ while test -d "$(git rev-parse --git-path rebase-merge 2> /dev/null)"; do
       exit 1
     else
       for f in $unmerged; do
-        if git ls-tree -r HEAD --name-only | grep -qx "$f"; then
+        rm -rf "$f" 2> /dev/null || true
+        if git cat-file -e "HEAD:${f}" 2> /dev/null; then
           git checkout HEAD -- "$f" > /dev/null 2>&1 || true
           git add "$f" > /dev/null 2>&1 || true
         else
-          git rm --cached --ignore-unmatch "$f" > /dev/null 2>&1 || true
-          rm -f "$f"
+          git rm -rf --cached --ignore-unmatch "$f" > /dev/null 2>&1 || true
         fi
       done
     fi
@@ -311,10 +314,11 @@ done
 
 echo "Restoring file states..."
 for file in "${selected_files_array[@]}"; do
-  if git ls-tree -r "$ORIGINAL_HEAD" --name-only | grep -qx "$file"; then
+  rm -rf "$file" 2> /dev/null || true
+  if git cat-file -e "${ORIGINAL_HEAD}:${file}" 2> /dev/null; then
     git restore --source="$ORIGINAL_HEAD" --staged --worktree -- "$file" > /dev/null 2>&1 || true
   else
-    git rm -f --ignore-unmatch "$file" > /dev/null 2>&1 || true
+    git rm -rf --cached --ignore-unmatch "$file" > /dev/null 2>&1 || true
   fi
 done
 
@@ -338,6 +342,9 @@ if [ "$ORIGINAL_WORKTREE_TREE" = "$FINAL_WORKTREE_TREE" ]; then
 else
   echo ""
   gum style --foreground 196 --bold "Error: Final file states deviate from the original state!"
+  echo "Deviating file states between original and rewritten worktree:"
+  git diff-tree -r --name-status "$ORIGINAL_WORKTREE_TREE" "$FINAL_WORKTREE_TREE" | sed 's/^/  /'
+  echo ""
   git reset --hard "$ORIGINAL_HEAD" > /dev/null
   if [ "$has_unstaged" -eq 1 ]; then
     git stash apply -q > /dev/null 2>&1 || true
