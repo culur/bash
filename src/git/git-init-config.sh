@@ -24,6 +24,8 @@ DESCRIPTION:
 
 PREREQUISITES:
   Requires curl, jq, and gum installed on your system.
+  On Windows, install them with Scoop first: scoop install curl jq charm-gum
+  If Scoop is unavailable, use WinGet: winget install curl.curl jqlang.jq charmbracelet.gum
 EOF
   exit 0
 }
@@ -41,6 +43,14 @@ done
 for cmd in curl jq gum; do
   if ! command -v "$cmd" &> /dev/null; then
     echo "Error: Command '$cmd' is not installed." >&2
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* || "${OSTYPE:-}" == win32* ]]; then
+      scoop_package="$cmd"
+      if [[ "$cmd" == "gum" ]]; then
+        scoop_package="charm-gum"
+      fi
+      echo "On Windows, install it with Scoop first: scoop install $scoop_package" >&2
+      echo "If Scoop is unavailable, use WinGet (see 'git init-config --help' for package IDs)." >&2
+    fi
     exit 1
   fi
 done

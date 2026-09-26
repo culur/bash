@@ -113,7 +113,9 @@ def check_git_repo() -> tuple[bool, str | None]:
             False,
             (
                 "[bold red]❌ Không tìm thấy lệnh 'git' trong PATH![/bold red]\n"
-                "[yellow]Vui lòng cài đặt Git và đảm bảo git có trong biến môi trường PATH.[/yellow]"
+                "[yellow]Trên Windows, hãy cài Git bằng Scoop trước: scoop install git. "
+                "Nếu không dùng được Scoop, dùng WinGet: winget install Git.Git. "
+                "Sau đó đảm bảo git có trong biến môi trường PATH.[/yellow]"
             ),
         )
     except (subprocess.SubprocessError, OSError) as e:

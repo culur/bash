@@ -24,5 +24,6 @@ if %ERRORLEVEL% equ 0 (
   exit /b %ERRORLEVEL%
 )
 
-echo Error: Git Bash or sh not found. Please install Git for Windows. >&2
+echo Error: Git Bash or sh not found. On Windows, install Git with Scoop first: scoop install git >&2
+echo If Scoop is unavailable, use WinGet: winget install Git.Git >&2
 exit /b 1

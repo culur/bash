@@ -33,7 +33,7 @@
 > mise use -g pnpm       # (optional, for package management)
 > ```
 >
-> Only use system package managers (**Homebrew** on macOS, **WinGet** on Windows) for OS-level utilities that are not managed by `mise` (e.g. `git`, `bash`, `gum`, `tmux`).
+> Only use system package managers for OS-level utilities that are not managed by `mise` (e.g. `git`, `bash`, `gum`, `tmux`). Use **Homebrew** on macOS. On Windows, install with **Scoop** first; use **WinGet** only when Scoop cannot be used.
 
 ### 1. Developer Toolchains (via `mise` - Both macOS & Windows)
 
@@ -57,17 +57,18 @@ mise use -g pnpm
 brew install bash gum tmux python3
 ```
 
-#### 🪟 On Windows (WinGet)
+#### 🪟 On Windows (Scoop preferred; WinGet fallback)
 
-1. **[Git for Windows](https://gitforwindows.org/)** (includes MSYS2 GNU Bash 5.x):
+Install Windows utilities through [Scoop](https://scoop.sh/) first:
+
+   ```powershell
+   scoop install git charm-gum
+   ```
+
+This installs **[Git for Windows](https://gitforwindows.org/)** (including MSYS2 GNU Bash 5.x) and **[gum](https://github.com/charmbracelet/gum)** for interactive prompts. If Scoop is unavailable in your environment, use WinGet instead:
 
    ```powershell
    winget install Git.Git
-   ```
-
-2. **[gum](https://github.com/charmbracelet/gum)** (for interactive selection prompts):
-
-   ```powershell
    winget install charmbracelet.gum
    ```
 

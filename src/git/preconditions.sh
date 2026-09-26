@@ -4,6 +4,10 @@
 ensure_git_exists() {
   if ! command -v git > /dev/null 2>&1; then
     echo "Error: git is not installed." >&2
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* || "${OSTYPE:-}" == win32* ]]; then
+      echo "On Windows, install it with Scoop first: scoop install git" >&2
+      echo "If Scoop is unavailable, use WinGet: winget install Git.Git" >&2
+    fi
     exit 1
   fi
 }
@@ -11,7 +15,13 @@ ensure_git_exists() {
 # Ensure gum exists
 ensure_gum_exists() {
   if ! command -v gum > /dev/null 2>&1; then
-    echo "Error: gum is not installed. Install from https://github.com/charmbracelet/gum" >&2
+    echo "Error: gum is not installed." >&2
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* || "${OSTYPE:-}" == win32* ]]; then
+      echo "On Windows, install it with Scoop first: scoop install charm-gum" >&2
+      echo "If Scoop is unavailable, use WinGet: winget install charmbracelet.gum" >&2
+    else
+      echo "Install it from https://github.com/charmbracelet/gum" >&2
+    fi
     exit 1
   fi
 }

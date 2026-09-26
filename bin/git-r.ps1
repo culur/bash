@@ -19,7 +19,7 @@ if (-not $bash) {
 }
 
 if (-not $bash) {
-    Write-Error "Git Bash or sh not found. Please install Git for Windows."
+    Write-Error "Git Bash or sh not found. Install Git with Scoop first: scoop install git. If Scoop is unavailable, use WinGet: winget install Git.Git"
     exit 1
 }
 
