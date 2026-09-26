@@ -72,7 +72,7 @@ except Exception:
     print("Error||||")
 ')
 
-        IFS='|' read -r b_state ts_ip ts_node ts_dns ts_tun <<< "$parsed"
+        IFS='|' read -r b_state ts_ip ts_node _ ts_tun <<< "$parsed"
 
         case "$b_state" in
             Running)
