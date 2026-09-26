@@ -2,32 +2,82 @@
 
 > A collection of interactive Bash utilities and custom Git subcommands designed to supercharge your Git workflow.
 
+---
+
+## 💻 Platform Compatibility Matrix
+
+| Command | Type | macOS | Windows | Key Requirements & Notes |
+| :--- | :--- | :---: | :---: | :--- |
+| **`git fixup`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias) |
+| **`git out`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias) |
+| **`git move`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias) |
+| **`git init-config`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0`, `curl` |
+| **`git r`** | Git Subcommand | ✅ | ✅ | `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias or `git-r.cmd`/`git-r.ps1`) |
+| **`clean-git`** | Standalone CLI | ✅ | ✅ | `uv`, `python >= 3.10`. Native Windows console (UTF-8 & VT100 ANSI) supported. |
+| **`ai-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`, POSIX `termios`/`tty`. **macOS/Linux only.** |
+| **`agy-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`. **macOS/Linux only (Deprecated).** |
+| **`tscale`** | Standalone CLI | ✅ | ❌ | Tailscale CLI + Microsoft GSA integration for macOS `launchd`. **macOS only.** |
+
+---
+
 ## 🚀 Prerequisites
 
-These utilities rely on the following CLI dependencies:
+> [!IMPORTANT]
+> **Tool Management Rule: Always install via `mise` first**
+> Developer tools and language runtimes (such as **`uv`**, **`python`**, **`node`**, **`pnpm`**) MUST always be installed and managed through **[mise](https://mise.jdx.dev/)** first:
+>
+> ```bash
+> # Install runtimes via mise (Both macOS & Windows)
+> mise use -g uv
+> mise use -g node@lts   # (optional, for code formatting tools)
+> mise use -g pnpm       # (optional, for package management)
+> ```
+>
+> Only use system package managers (**Homebrew** on macOS, **WinGet** on Windows) for OS-level utilities that are not managed by `mise` (e.g. `git`, `bash`, `gum`, `tmux`).
 
-- **Git**
-- **Bash (>= 4.0)**: Required for features like the `mapfile` (or `readarray`) command. Note that the default pre-installed Bash on macOS is version 3.2.x, which is too old and does not support `mapfile`.
-- **[gum](https://github.com/charmbracelet/gum)** (for interactive selection prompts)
-- **tmux** & **Python 3** (required for `agy-usage` headless terminal screen capture and parsing)
+### 1. Developer Toolchains (via `mise` - Both macOS & Windows)
 
-To install these dependencies (on macOS via Homebrew):
+Ensure `mise` is installed ([mise installation guide](https://mise.jdx.dev/getting-started.html)), then install the required tools:
 
 ```bash
-# Install modern Bash (which includes mapfile support)
-brew install bash
+# Required for Python scripts (clean-git, ai-usage, agy-usage) and dependency management
+mise use -g uv
 
-# Install gum, tmux, and python3
-brew install gum tmux python3
+# (Optional) For Prettier/JavaScript formatting
+mise use -g node@lts
+mise use -g pnpm
 ```
+
+### 2. System Utilities (via OS Package Managers)
+
+#### 🍏 On macOS (Homebrew)
+
+```bash
+# Modern Bash (>= 4.0 with mapfile support), gum interactive selector, tmux & python3
+brew install bash gum tmux python3
+```
+
+#### 🪟 On Windows (WinGet)
+
+1. **[Git for Windows](https://gitforwindows.org/)** (includes MSYS2 GNU Bash 5.x):
+
+   ```powershell
+   winget install Git.Git
+   ```
+
+2. **[gum](https://github.com/charmbracelet/gum)** (for interactive selection prompts):
+
+   ```powershell
+   winget install charmbracelet.gum
+   ```
 
 ---
 
 ## ✨ Features & Usage
 
-This package provides interactive commands for Git workflow automation:
-
 ### 1. `git fixup` (or `git-fixup`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias)
 
 Stage changes for a file, commit them as a `fixup!` commit against a target commit, and automatically execute an interactive rebase with autosquash and autostash.
 
@@ -50,53 +100,49 @@ Stage changes for a file, commit them as a `fixup!` commit against a target comm
   ```bash
   # Fix up staged files (or interactively choose modified files if none staged)
   git fixup
-  
+
   # Search from the last 15 commits in the entire history
   git fixup 15
   ```
 
+---
+
 ### 2. `git out` (or `git-out`)
 
-Interactively pull files out of a selected commit in your history, rewriting the commit history to exclude them and returning the pulled files to your working tree as modifications.
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias)
+
+Interactively select files from a specific commit or range of commits to pull them out of history and restore them into your working directory as uncommitted changes.
 
 - **Options:**
-  - `git out [COMMIT]` or `git out [NUMBER]`: Specify the target commit directly via positional argument (e.g., `HEAD~1`, `~1`, `feat/abc`, `a1b2c3d`) or specify an interactive limit (e.g., `5`, `20`). If omitted, defaults to interactively selecting from the last 50 commits.
+  - `git out [COMMIT_HASH|SHORTHAND]`: Target a specific commit (e.g., `HEAD~1`, `~2`, or commit hash). If omitted, defaults to the parent commit (`HEAD~1`).
+  - `-a, --all`: Pull files out of the target commit and **all subsequent commits** up to `HEAD`.
   - `-h, --help`: Show help message.
-  - `-a, --all, --acc, --accumulation`: Find all files changed from the selected commit up to `HEAD` (accumulate changes across subsequent commits).
 
 - **How it works:**
-  1. Identifies files changed in the selected commit (or up to `HEAD` if `-a` is used).
-  2. Displays an interactive list allowing you to select (or multi-select) files using `gum`.
-  3. Automatically performs an interactive rebase to check out the parent state of the target commit for those selected files (effectively removing them from the commit).
-  4. Resolves conflicts cleanly, deletes files if they didn't exist in the parent commit, and handles empty commits gracefully.
-  5. Restores the selected files to your working tree as staged modifications.
+  1. Checks for staged or uncommitted changes, stashing them if necessary.
+  2. Displays an interactive menu using `gum` to let you select which files to pull out from the target commit (or commit range).
+  3. Extracts the selected files and places them as uncommitted changes in your working tree.
+  4. Automatically rebases history to rewrite the commits as if the selected files were never part of them.
+  5. If conflict arises or tests fail, aborts safely and restores your repository to its exact prior state.
 
 - **Examples:**
 
   ```bash
-  # Interactively select a commit from the last 50 commits (Default)
+  # Pull files out of the previous commit (HEAD~1)
   git out
-  
-  # Interactively select a commit from the last 5 commits
-  git out 5
-  
+
   # Pull files out of the commit HEAD~1 using shorthand ~1
   git out ~1
-  
-  # Pull files out of commit HEAD~2
-  git out HEAD~2
-  
-  # Pull files out of commit at branch feat/abc
-  git out feat/abc
-  
-  # Pull files out of commit hash a1b2c3d
-  git out a1b2c3d
-  
+
   # Pull files out of ~1 and all subsequent commits up to HEAD
   git out ~1 -a
   ```
 
+---
+
 ### 3. `git move` (or `git-move`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias)
 
 Interactively select one or multiple commits from history, preview their accumulated file changes, and move them to be placed directly after a chosen target commit using automated rebase.
 
@@ -118,12 +164,16 @@ Interactively select one or multiple commits from history, preview their accumul
   ```bash
   # Interactively select commit(s) from the last 50 commits to move (Default)
   git move
-  
+
   # Interactively select commit(s) from the last 15 commits to move
   git move 15
   ```
 
+---
+
 ### 4. `git init-config` (or `git-init-config`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias)
 
 Interactively generate and initialize `.gitattributes` and `.gitignore` files for your project by fetching official templates from GitHub repositories.
 
@@ -142,12 +192,16 @@ Interactively generate and initialize `.gitattributes` and `.gitignore` files fo
   ```bash
   # Interactively initialize .gitattributes and .gitignore for your repository
   git init-config
-  
+
   # Display help message
   git init-config --help
   ```
 
+---
+
 ### 5. `git r` (or `git-r`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias or `git-r.ps1` / `git-r.cmd`)
 
 Temporarily toggle the Git remote `origin` up or down so your repository behaves as a local-only repository (e.g. to test local workflows, prevent accidental pushes, or simulate an untracked local repository) without losing branch tracking configurations or remote commit history.
 
@@ -180,168 +234,181 @@ Temporarily toggle the Git remote `origin` up or down so your repository behaves
   git r up
   ```
 
-### 6. `ai-usage`
+---
 
-An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI usage and quota metrics in real-time. **Currently, this command only supports the Google Antigravity CLI (`agy`).**
+### 6. `clean-git`
+
+> **Platform Support:** ✅ macOS · ✅ Windows
+
+A safe, interactive Git workspace cleaner written in Python and executed via `uv`. It scans untracked and gitignored files/directories, calculates space reclaimed, and lets you interactively choose what to delete with `InquirerPy` and `rich`.
+
+- **Key Highlights:**
+  - **Safety First:** Automatically protects `.env*` files by default to avoid accidental deletion of credentials.
+  - **Dry Run Support:** Review the total space to be reclaimed before performing any deletion.
+  - **Cross-Platform:** Native support on both macOS/Linux and Windows (with VT100 ANSI sequences and UTF-8 console output).
 
 - **Options:**
-  - _(None at the moment, just run `ai-usage`)_
-
-- **How it works:**
-  1. **Headless Terminal Emulation:** Spawns a background `tmux` session to run the `agy` CLI invisibly.
-  2. **Automated Data Extraction:** Continuously monitors the startup screen to parse your account profile and automatically triggers the initial `/usage` command.
-  3. **2-Stage Prompt & Response Lifecycle Tracking:**
-     - **Trigger 1 (Prompt Sent):** Monitors `~/.gemini/antigravity-cli/history.jsonl` for new token-consuming AI prompts (filtering by `conversationId` and ignoring non-token slash commands like `/usage` or `/model`) to fetch initial quota metrics when a prompt starts.
-     - **Trigger 2 (Response Completed / Timeout):** Dynamically tracks `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript.jsonl` until the LLM finishes generating (`source: MODEL`, `type: PLANNER_RESPONSE`, `status: DONE`) or hits a 120-second sliding inactivity timeout (reset on any new log activity). Triggers a second `/usage` query to capture exact final token consumption.
-  4. **Dynamic Local Time Delta Calculations:** Recalculates elapsed time, remaining quota countdowns, and pacing differentials (`% token used` vs `% time passed`) locally every second using high-precision local clock deltas, providing a smooth real-time TUI update.
-  5. **Instant Non-Blocking Controls (0ms delay):** Uses OS I/O multiplexing (`select.select`) to instantly handle user input.
-     - Use `[tab]` to switch between Model Groups (e.g., `GEMINI MODELS` vs `CLAUDE AND GPT MODELS`).
-     - Use `[f]` to toggle the visibility of the Five-Hour Limit metrics.
-     - Use `[r]` or `[enter]` to trigger a live manual background refresh instantly.
-     - Use `[esc]` to cleanly exit the session.
+  - `-h, --help`: Show help message.
+  - `-e, --exclude PATTERN`: Exclude pattern (defaults to protecting `.env*`). Can be passed multiple times (e.g. `-e secret.json -e "*.local"`).
+  - `--dry-run-only`: Show the preview summary table and exit without prompting for deletion.
 
 - **Examples:**
 
   ```bash
-  # Launch the interactive AI Usage dashboard
-  ai-usage
-  ```
+  # Run interactive cleaning
+  clean-git
 
-- **Example Output:**
+  # Preview files and size without deleting
+  clean-git --dry-run-only
 
-  ```text
-  Antigravity Usage CLI
-
-  Antigravity CLI 1.1.8
-  email@gmail.com (Google AI Pro)
-
-  GEMINI MODELS (13.33%) | CLAUDE AND GPT MODELS (100.00%)
-    Models within this group: Gemini Flash, Gemini Pro
-
-    Weekly Limit
-    [███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 13.80%
-      14% remaining · Refreshes in 57m
-
-    Weekly Remaining
-    [███████████████████████████████████████████░░░░░░░] 87.50%
-    Passed: 167h (6d 23h) · Remaining: 0h 43m
-    You are using tokens 12.90% slower than time elapsed (keep going!)
-
-  ────────────────────────────────────────────────────────────────────────────────
-  [tab] Switch Group · [f] Toggle 5-Hour Limit
-  [r] or [enter] Refresh · [esc] Exit
-  ```
-
-### 7. `agy-usage` (Maintain Only / Deprecated)
-
-_(Note: This is the legacy one-shot print command. It is currently in maintain-only mode and may be removed in the future. Please use `ai-usage` instead for the full interactive experience.)_
-
-An automated script for Google Antigravity CLI (`agy`) usage metrics, leveraging headless PTY screen capture to parse TUI output with 0 LLM token cost and 0 API risk.
-
-- **Options:**
-  - `--mock`: Run in mock mode with sample data to test visual rendering without invoking `tmux` or `agy`.
-
-- **How it works:**
-  1. **Headless Terminal Emulation:** Spawns a background `tmux` PTY session (`agy_usage_<PID>`) at a fixed resolution (120x40) running the `agy` CLI.
-  2. **Automated Handshake & Query:** Continuously polls the terminal buffer via `tmux capture-pane`, auto-confirms prompt trust dialogues, and sends the `/usage` TUI command once the CLI is ready.
-  3. **Regex Metric Parsing:** Captures pane output upon detecting `/usage` response, extracts remaining Gemini quota percentage and refresh duration, and terminates the `tmux` session cleanly.
-  4. **Quota Pacing & Time Analysis:** Calculates elapsed time vs. consumed quota across the 7-day (168-hour) cycle to determine your consumption pace differential (`% token used` vs `% time passed`).
-  5. **Rich Terminal Visuals:** Prints ANSI progress bars, status spinners, remaining time metrics, and dynamic color-coded pace warnings before exiting.
-
-- **Examples:**
-
-  ```bash
-  # Query real-time agy quota usage and pace once and exit
-  agy-usage
-
-  # Run in mock mode to preview UI formatting
-  agy-usage --mock
-  ```
-
-- **Example Output:**
-
-  ```text
-  [1/4] ✓ Starting headless tmux session...
-  [2/4] ✓ Launching agy CLI and waiting for sign-in...
-  [3/4] ✓ Querying usage via /usage command...
-  [4/4] ✓ Capturing screen and parsing quota metrics...
-
-  Weekly Limit
-    [███████████████████████████████░░░░░░░░░░░░░░░░░░░] 62.82%
-
-  Weekly Remaining
-    [█████████████████████████████████░░░░░░░░░░░░░░░░░] 66.22%
-    Passed: 56h (2d 8h) · Remaining: 111h (4d 15h)
-
-    You are using tokens 3.40% faster than time elapsed (be careful, might run out!)
+  # Exclude custom sensitive files
+  clean-git -e "secret.json" -e "*.pem"
   ```
 
 ---
 
-## 📦 Installation
+### 7. `ai-usage`
+
+> [!WARNING]
+> **macOS & Linux only:** This tool relies on background `tmux` sessions, POSIX `termios`, and `tty` I/O multiplexing. It is **not** supported on Windows native terminals.
+
+An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI usage and quota metrics in real-time. **Currently, this command only supports the Google Antigravity CLI (`agy`).**
+
+- **Examples:**
+
+  ```bash
+  # Launch the interactive AI Usage dashboard (macOS / Linux)
+  ai-usage
+  ```
+
+---
+
+### 8. `agy-usage` (Maintain Only / Deprecated)
+
+> [!WARNING]
+> **macOS & Linux only (Deprecated):** This is the legacy one-shot print command that relies on headless `tmux` capture. Please use `ai-usage` instead on macOS/Linux.
+
+- **Examples:**
+
+  ```bash
+  agy-usage
+  agy-usage --mock
+  ```
+
+---
+
+### 9. `tscale`
+
+> [!WARNING]
+> **macOS only:** Designed specifically for macOS `launchd` and Microsoft Entra Global Secure Access (GSA) coexistence.
+
+Controls Tailscale CLI daemon and inspects VPN status on macOS. See [src/tailscale/README.md](./src/tailscale/README.md) for full architecture and daemon configuration.
+
+---
+
+## 📦 Installation & Setup
 
 ### Step 1: Clone the Repository
-
-Clone the repository to your local machine:
 
 ```bash
 git clone https://github.com/culur/bash.git
 cd bash
 ```
 
-### Step 2: Grant Executable Permissions
+### Step 2: Install Project Dependencies
 
-Make sure the scripts have executable permissions. Run this command inside the cloned repository root:
-
-```bash
-chmod +x bin/git-fixup bin/git-out bin/git-move bin/git-init-config bin/agy-usage
-```
-
-### Step 3: Configure to use the commands
-
-Choose one of the following options to make the commands available in your environment:
-
-#### Option A: Add the `bin/` Directory to your `PATH` (Recommended)
-
-Since the scripts inside the `bin/` directory are prefixed with `git-` (`git-fixup`, `git-out`, and `git-move`), adding the `bin/` directory directly to your shell's `PATH` allows Git to automatically discover them as subcommands.
-
-Add this line to your shell configuration file (e.g., `~/.zshrc` or `~/.bash_profile`), replacing `/path/to/cloned/bash` with the actual absolute path to the directory where you cloned the repository:
+Synchronize Python dependencies (CPython 3.14 + `ruff`):
 
 ```bash
-export PATH="/path/to/cloned/bash/bin:$PATH"
+uv sync
 ```
 
-_(Tip: Or dynamically if you are in the project folder: `export PATH="$(pwd)/bin:$PATH"`)_
-
-Then reload your configuration:
+*(Optional for Node.js formatting tools if using pnpm):*
 
 ```bash
-source ~/.zshrc
+pnpm install
 ```
 
-#### Option B: Register Git Aliases (Alternative)
+---
 
-If you prefer not to modify your shell's `PATH` variable, you can define Git aliases pointing directly to the scripts. Make sure to replace `/path/to/cloned/bash` with the actual absolute path to the directory where you cloned the repository.
+### Step 3: Platform Configuration
 
-##### Global Config (Available in all repositories)
+Choose your operating system below:
+
+#### 🍏 For macOS Users
+
+1. **Make scripts executable:**
+
+   ```bash
+   chmod +x bin/*
+   ```
+
+2. **Option A: Add `bin/` directory to `PATH` (Recommended):**
+   Add this line to your `~/.zshrc` or `~/.bash_profile`:
+
+   ```bash
+   export PATH="/path/to/cloned/bash/bin:$PATH"
+   ```
+
+   Then reload: `source ~/.zshrc`.
+
+3. **Option B: Register Git Aliases:**
+
+   ```bash
+   git config --global alias.fixup "!/path/to/cloned/bash/bin/git-fixup"
+   git config --global alias.out "!/path/to/cloned/bash/bin/git-out"
+   git config --global alias.move "!/path/to/cloned/bash/bin/git-move"
+   git config --global alias.init-config "!/path/to/cloned/bash/bin/git-init-config"
+   git config --global alias.r "!/path/to/cloned/bash/bin/git-r"
+   ```
+
+---
+
+#### 🪟 For Windows Users
+
+On Windows, Git subcommands require a two-part setup:
+
+1. **Add `bin/` to User `PATH`**: Makes the standalone CLI `clean-git` (`clean-git.cmd`) and `git-r` (`git-r.cmd`/`git-r.ps1`) available globally in PowerShell and CMD.
+2. **Register Global Git Aliases**: In Git on Windows, repository symlinks in `bin/` are checked out as plain text files, causing `cannot spawn: Exec format error` if executed via PATH directly. Using Git Aliases with `!bash "..."` tells Git for Windows to execute the `.sh` scripts using Git's bundled MSYS2 GNU Bash (v5.x), seamlessly integrating with `gum.exe`.
+
+Run the following commands in **PowerShell** (replace `C:/code/repo-culur/bash` with your actual repository path):
+
+```powershell
+# 1. Add bin/ to User PATH (Idempotent: only adds if not already present)
+$repoBin = "C:\code\repo-culur\bash\bin"
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ';' | Where-Object { $_.TrimEnd('\') -eq $repoBin.TrimEnd('\') }).Count -eq 0) {
+    $newUserPath = if ($userPath -and -not $userPath.EndsWith(';')) { "$userPath;$repoBin" } else { "$userPath$repoBin" }
+    [Environment]::SetEnvironmentVariable("Path", $newUserPath, "User")
+    Write-Host "Added $repoBin to User PATH."
+}
+
+# 2. Register Global Git Subcommands
+$repoSrc = "C:/code/repo-culur/bash/src"
+git config --global alias.fixup "!bash `"$repoSrc/git-fixup.sh`""
+git config --global alias.out "!bash `"$repoSrc/git-out.sh`""
+git config --global alias.move "!bash `"$repoSrc/git-move.sh`""
+git config --global alias.init-config "!bash `"$repoSrc/git-init-config.sh`""
+git config --global alias.r "!bash `"$repoSrc/git-r.sh`""
+```
+
+---
+
+### Step 4: Verification
+
+Test that all tools are working in your shell:
 
 ```bash
-git config --global alias.fixup "!/path/to/cloned/bash/bin/git-fixup"
-git config --global alias.out "!/path/to/cloned/bash/bin/git-out"
-git config --global alias.move "!/path/to/cloned/bash/bin/git-move"
-git config --global alias.init-config "!/path/to/cloned/bash/bin/git-init-config"
+# 1. Test clean-git CLI
+clean-git --help
+
+# 2. Test Git Subcommands
+git fixup -h
+git out -h
+git move -h
+git init-config -h
+git r -h
 ```
-
-##### Local Config (Only available inside a specific repository)
-
-```bash
-git config alias.fixup "!/path/to/cloned/bash/bin/git-fixup"
-git config alias.out "!/path/to/cloned/bash/bin/git-out"
-git config alias.move "!/path/to/cloned/bash/bin/git-move"
-git config alias.init-config "!/path/to/cloned/bash/bin/git-init-config"
-```
-
-_(Note: The `!` prefix at the start of the alias command is required. It tells Git to run the script in an external shell using its absolute path.)_
 
 ---
 
