@@ -23,6 +23,6 @@ if (-not $bash) {
     exit 1
 }
 
-$scriptPath = Join-Path $PSScriptRoot "..\src\git-r.sh"
+$scriptPath = Join-Path $PSScriptRoot "..\src\git\git-r.sh"
 & $bash $scriptPath @args
 exit $LASTEXITCODE

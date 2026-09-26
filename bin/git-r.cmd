@@ -3,24 +3,24 @@ setlocal
 
 rem Prioritize Git for Windows bash/sh over WSL bash
 if exist "%ProgramFiles%\Git\bin\bash.exe" (
-  "%ProgramFiles%\Git\bin\bash.exe" "%~dp0..\src\git-r.sh" %*
+  "%ProgramFiles%\Git\bin\bash.exe" "%~dp0..\src\git\git-r.sh" %*
   exit /b %ERRORLEVEL%
 )
 
 if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" (
-  "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" "%~dp0..\src\git-r.sh" %*
+  "%LOCALAPPDATA%\Programs\Git\bin\bash.exe" "%~dp0..\src\git\git-r.sh" %*
   exit /b %ERRORLEVEL%
 )
 
 where sh >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-  sh "%~dp0..\src\git-r.sh" %*
+  sh "%~dp0..\src\git\git-r.sh" %*
   exit /b %ERRORLEVEL%
 )
 
 where bash >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-  bash "%~dp0..\src\git-r.sh" %*
+  bash "%~dp0..\src\git\git-r.sh" %*
   exit /b %ERRORLEVEL%
 )
 

@@ -384,7 +384,7 @@ if (($userPath -split ';' | Where-Object { $_.TrimEnd('\') -eq $repoBin.TrimEnd(
 }
 
 # 2. Register Global Git Subcommands
-$repoSrc = "C:/code/repo-culur/bash/src"
+$repoSrc = "C:/code/repo-culur/bash/src/git"
 git config --global alias.fixup "!bash `"$repoSrc/git-fixup.sh`""
 git config --global alias.out "!bash `"$repoSrc/git-out.sh`""
 git config --global alias.move "!bash `"$repoSrc/git-move.sh`""
