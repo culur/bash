@@ -481,3 +481,4 @@ __marimo__/
 
 #! ----- ----- ----- ----- ----- Custom ----- ----- ----- ----- ----- !#
 # Custom repository-specific ignore rules and patterns
+configs/git-accounts.json

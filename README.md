@@ -13,6 +13,7 @@
 | **`git move`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias) |
 | **`git init-config`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0`, `curl` |
 | **`git r`** | Git Subcommand | ✅ | ✅ | `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias or `git-r.cmd`/`git-r.ps1`) |
+| **`git acc`** | Git Subcommand / CLI | ✅ | ✅ | `python >= 3.10` or `uv`. Interactive commit account switcher. |
 | **`clean-git`** | Standalone CLI | ✅ | ✅ | `uv`, `python >= 3.10`. Native Windows console (UTF-8 & VT100 ANSI) supported. |
 | **`ai-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`, POSIX `termios`/`tty`. **macOS/Linux only.** |
 | **`agy-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`. **macOS/Linux only (Deprecated).** |
@@ -237,7 +238,36 @@ Temporarily toggle the Git remote `origin` up or down so your repository behaves
 
 ---
 
-### 6. `clean-git`
+### 6. `git acc` (or `git-acc`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via `git acc`, `git-acc.ps1`, `git-acc.cmd`, or `git-acc.sh`)
+
+Interactively manage and switch your Git commit author identities (`user.name` and `user.email`). Easily toggle between personal, work, and open-source profiles without manually editing `.gitconfig`.
+
+- **Key Highlights:**
+  - **Interactive TUI Navigation:** Use `↑`/`↓` (or `k`/`j`) to navigate your accounts list and the "Add new" option; press `Enter` to switch Git's global identity.
+  - **Active Profile Badge:** Clearly marks the currently active profile with `✔ [active]`.
+  - **Inline Editing (`e`):** Press `e` on any account to edit its username and email; automatically syncs Git global config if the edited account is currently active.
+  - **Safe Deletion (`Del` or `d`):** Confirms before deleting. If deleting the active account, automatically activates the next account in the list. If it is the only account remaining, requires adding a replacement account before deletion.
+  - **Zero External Dependencies:** Built with Python standard library (`msvcrt` on Windows, `termios` on POSIX); fast startup with no package installs required.
+  - **Local Storage:** Saved to `configs/git-accounts.json` inside the repository (gitignored).
+
+- **Keybindings:**
+  - `↑` / `↓`, `k` / `j`: Navigate accounts and "Add new"
+  - `Enter`: Select and switch active Git account
+  - `e`: Edit username and email of selected account
+  - `Del` / `d`: Delete selected account (with safety guardrails)
+  - `q` / `ESC`: Quit without changes
+
+- **Options:**
+  - `git acc`: Open interactive menu (Default).
+  - `-l, --list`: Display configured accounts and active identity non-interactively.
+  - `-c, --current`: Display current active Git global identity.
+  - `-h, --help`: Show help message.
+
+---
+
+### 7. `clean-git`
 
 > **Platform Support:** ✅ macOS · ✅ Windows
 
@@ -361,6 +391,7 @@ Choose your operating system below:
    git config --global alias.move "!/path/to/cloned/bash/bin/git-move"
    git config --global alias.init-config "!/path/to/cloned/bash/bin/git-init-config"
    git config --global alias.r "!/path/to/cloned/bash/bin/git-r"
+   git config --global alias.acc "!/path/to/cloned/bash/bin/git-acc"
    ```
 
 ---
@@ -369,7 +400,7 @@ Choose your operating system below:
 
 On Windows, Git subcommands require a two-part setup:
 
-1. **Add `bin/` to User `PATH`**: Makes the standalone CLI `clean-git` (`clean-git.cmd`) and `git-r` (`git-r.cmd`/`git-r.ps1`) available globally in PowerShell and CMD.
+1. **Add `bin/` to User `PATH`**: Makes standalone and cross-platform CLIs `clean-git` (`clean-git.cmd`), `git-r` (`git-r.cmd`/`git-r.ps1`), and `git-acc` (`git-acc.cmd`/`git-acc.ps1`) available globally in PowerShell and CMD.
 2. **Register Global Git Aliases**: In Git on Windows, repository symlinks in `bin/` are checked out as plain text files, causing `cannot spawn: Exec format error` if executed via PATH directly. Using Git Aliases with `!bash "..."` tells Git for Windows to execute the `.sh` scripts using Git's bundled MSYS2 GNU Bash (v5.x), seamlessly integrating with `gum.exe`.
 
 Run the following commands in **PowerShell** (replace `C:/code/repo-culur/bash` with your actual repository path):
@@ -391,6 +422,7 @@ git config --global alias.out "!bash `"$repoSrc/git-out.sh`""
 git config --global alias.move "!bash `"$repoSrc/git-move.sh`""
 git config --global alias.init-config "!bash `"$repoSrc/git-init-config.sh`""
 git config --global alias.r "!bash `"$repoSrc/git-r.sh`""
+git config --global alias.acc "!bash `"$repoSrc/git-acc.sh`""
 ```
 
 ---
@@ -409,6 +441,7 @@ git out -h
 git move -h
 git init-config -h
 git r -h
+git acc -h
 ```
 
 ---

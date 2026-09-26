@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PY_SCRIPT="$SCRIPT_DIR/../src/git/git-acc.py"
+
+if [ -f "$SCRIPT_DIR/git-acc.py" ]; then
+  PY_SCRIPT="$SCRIPT_DIR/git-acc.py"
+fi
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run "$PY_SCRIPT" "$@"
+elif command -v python3 >/dev/null 2>&1; then
+  exec python3 "$PY_SCRIPT" "$@"
+elif command -v python >/dev/null 2>&1; then
+  exec python "$PY_SCRIPT" "$@"
+else
+  echo "Error: Neither uv nor python was found on your system." >&2
+  exit 1
+fi
