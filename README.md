@@ -147,7 +147,40 @@ Interactively generate and initialize `.gitattributes` and `.gitignore` files fo
   git init-config --help
   ```
 
-### 5. `ai-usage`
+### 5. `git r` (or `git-r`)
+
+Temporarily toggle the Git remote `origin` up or down so your repository behaves as a local-only repository (e.g. to test local workflows, prevent accidental pushes, or simulate an untracked local repository) without losing branch tracking configurations or remote commit history.
+
+> [!NOTE]
+> This command strictly supports only repositories with a single remote named `origin`. If multiple remotes exist or the remote is not named `origin`, the script halts immediately with an error.
+
+- **Options:**
+  - `git r` or `git r status`: Display current status of `origin` (`[UP]` or `[DOWN]`) along with its URL (Default).
+  - `git r down`: Disable the active `origin` remote and detach upstream branch tracking.
+  - `git r up`: Re-enable the disabled `origin` remote and restore upstream branch tracking.
+  - `-h, --help`: Show help message.
+
+- **How it works:**
+  1. **Strict Single-Origin Safety:** Validates repository remotes upfront and fails fast if the repository has multiple remotes or a non-`origin` remote.
+  2. **Safe Native Config Toggling:** Renames the remote configuration section between `remote.origin` and `disabled-remote.origin` using `git config --rename-section`, ensuring file safety, concurrency locking, and full reversibility.
+  3. **Upstream Branch Tracking Preservation:** Stashes branch tracking mappings (`branch.<name>.remote` -> `branch.<name>.disabled-remote`) so `git status` and `git push` treat branches as clean local branches without remote destinations.
+  4. **Conflict Diagnostic & Safe Abort:** If a new `origin` is added while the original is disabled (e.g. via GUI/IDE action), `git r up` safely aborts without altering any configuration, logging a detailed diagnostic report with old vs new URLs, tracked branches, and existing remote refs.
+  5. **Zero History Loss:** Does not delete cached remote tracking refs or commit objects, keeping them safe from garbage collection and avoiding any need to re-fetch from the network upon re-enabling.
+
+- **Examples:**
+
+  ```bash
+  # Check status of origin
+  git r
+
+  # Disable origin remote (switch to local-only mode)
+  git r down
+
+  # Re-enable origin remote and restore tracking
+  git r up
+  ```
+
+### 6. `ai-usage`
 
 An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI usage and quota metrics in real-time. **Currently, this command only supports the Google Antigravity CLI (`agy`).**
 
@@ -199,7 +232,7 @@ An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI us
   [r] or [enter] Refresh · [esc] Exit
   ```
 
-### 6. `agy-usage` (Maintain Only / Deprecated)
+### 7. `agy-usage` (Maintain Only / Deprecated)
 
 _(Note: This is the legacy one-shot print command. It is currently in maintain-only mode and may be removed in the future. Please use `ai-usage` instead for the full interactive experience.)_
 
