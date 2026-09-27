@@ -14,6 +14,7 @@
 | **`git init-config`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0`, `curl` |
 | **`git r`** | Git Subcommand | ✅ | ✅ | `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias or `git-r.cmd`/`git-r.ps1`) |
 | **`git acc`** | Git Subcommand / CLI | ✅ | ✅ | `python >= 3.10` or `uv`. Interactive commit account switcher. |
+| **`git reacc`** | Git Subcommand | ✅ | ✅ | `gum`, `bash >= 4.0` (On Windows: run via Git for Windows + Git Alias or `git-reacc.cmd`/`git-reacc.ps1`) |
 | **`clean-git`** | Standalone CLI | ✅ | ✅ | `uv`, `python >= 3.10`. Native Windows console (UTF-8 & VT100 ANSI) supported. |
 | **`ai-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`, POSIX `termios`/`tty`. **macOS/Linux only.** |
 | **`agy-usage`** | Standalone CLI | ✅ | ❌ | `tmux`, `python 3`. **macOS/Linux only (Deprecated).** |
@@ -267,7 +268,38 @@ Interactively manage and switch your Git commit author identities (`user.name` a
 
 ---
 
-### 7. `clean-git`
+### 7. `git reacc` (or `git-reacc`)
+
+> **Platform Support:** ✅ macOS · ✅ Windows (via Git Bash & Alias or `git-reacc.cmd` / `git-reacc.ps1`)
+
+Interactively rewrite commit committer (and optionally author) identity across a range of commits up to `HEAD` using identities configured in `git acc`.
+
+- **Key Highlights:**
+  - **Seamless `git acc` Integration:** Automatically loads profiles from `configs/git-accounts.json` with fallback to current Git identity or custom manual input.
+  - **Flexible Rewrite Scope:** Choose between rewriting **Committer only** (preserving original author and author timestamp) or **Both Author & Committer** (updating both author and committer identities).
+  - **Preserves Author Timestamp:** When updating author identity, uses `--author` to ensure the original author timestamp (`GIT_AUTHOR_DATE`) remains 100% unchanged.
+  - **Protects Working Tree State:** Safely stashes uncommitted staged, unstaged, and untracked changes before rewriting, and flawlessly restores index separation (`--index`) upon completion.
+  - **Clean & Safe Rollback:** Tracks `ORIGINAL_HEAD` in memory with automated trap handlers for clean rollback if canceled (`Ctrl+C`) or failed—leaving zero leftover backup branches in your repository.
+  - **Preserves Merge Structure:** Automatically passes `--rebase-merges` if the commit range contains merge commits.
+
+- **Options:**
+  - `git reacc [NUMBER]`: Specify the number of recent commits to display in the interactive menu (default: 30).
+  - `-n, -c, --count NUMBER`: Specify the number of commits to display.
+  - `-h, --help`: Show help message.
+
+- **Examples:**
+
+  ```bash
+  # Interactively select identity, scope, and target commit from the last 30 commits
+  git reacc
+
+  # Choose from the last 10 commits
+  git reacc 10
+  ```
+
+---
+
+### 8. `clean-git`
 
 > **Platform Support:** ✅ macOS · ✅ Windows
 
@@ -298,7 +330,7 @@ A safe, interactive Git workspace cleaner written in Python and executed via `uv
 
 ---
 
-### 7. `ai-usage`
+### 9. `ai-usage`
 
 > [!WARNING]
 > **macOS & Linux only:** This tool relies on background `tmux` sessions, POSIX `termios`, and `tty` I/O multiplexing. It is **not** supported on Windows native terminals.
@@ -314,7 +346,7 @@ An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI us
 
 ---
 
-### 8. `agy-usage` (Maintain Only / Deprecated)
+### 10. `agy-usage` (Maintain Only / Deprecated)
 
 > [!WARNING]
 > **macOS & Linux only (Deprecated):** This is the legacy one-shot print command that relies on headless `tmux` capture. Please use `ai-usage` instead on macOS/Linux.
@@ -328,7 +360,7 @@ An interactive, responsive Terminal UI (TUI) dashboard for visualizing AI CLI us
 
 ---
 
-### 9. `tscale`
+### 11. `tscale`
 
 > [!WARNING]
 > **macOS only:** Designed specifically for macOS `launchd` and Microsoft Entra Global Secure Access (GSA) coexistence.
@@ -392,6 +424,7 @@ Choose your operating system below:
    git config --global alias.init-config "!/path/to/cloned/bash/bin/git-init-config"
    git config --global alias.r "!/path/to/cloned/bash/bin/git-r"
    git config --global alias.acc "!/path/to/cloned/bash/bin/git-acc"
+   git config --global alias.reacc "!/path/to/cloned/bash/bin/git-reacc"
    ```
 
 ---
@@ -400,7 +433,7 @@ Choose your operating system below:
 
 On Windows, Git subcommands require a two-part setup:
 
-1. **Add `bin/` to User `PATH`**: Makes standalone and cross-platform CLIs `clean-git` (`clean-git.cmd`), `git-r` (`git-r.cmd`/`git-r.ps1`), and `git-acc` (`git-acc.cmd`/`git-acc.ps1`) available globally in PowerShell and CMD.
+1. **Add `bin/` to User `PATH`**: Makes standalone and cross-platform CLIs `clean-git` (`clean-git.cmd`), `git-r` (`git-r.cmd`/`git-r.ps1`), `git-acc` (`git-acc.cmd`/`git-acc.ps1`), and `git-reacc` (`git-reacc.cmd`/`git-reacc.ps1`) available globally in PowerShell and CMD.
 2. **Register Global Git Aliases**: In Git on Windows, repository symlinks in `bin/` are checked out as plain text files, causing `cannot spawn: Exec format error` if executed via PATH directly. Using Git Aliases with `!bash "..."` tells Git for Windows to execute the `.sh` scripts using Git's bundled MSYS2 GNU Bash (v5.x), seamlessly integrating with `gum.exe`.
 
 Run the following commands in **PowerShell** (replace `C:/code/repo-culur/bash` with your actual repository path):
@@ -423,6 +456,7 @@ git config --global alias.move "!bash `"$repoSrc/git-move.sh`""
 git config --global alias.init-config "!bash `"$repoSrc/git-init-config.sh`""
 git config --global alias.r "!bash `"$repoSrc/git-r.sh`""
 git config --global alias.acc "!bash `"$repoSrc/git-acc.sh`""
+git config --global alias.reacc "!bash `"$repoSrc/git-reacc.sh`""
 ```
 
 ---
@@ -442,6 +476,7 @@ git move -h
 git init-config -h
 git r -h
 git acc -h
+git reacc -h
 ```
 
 ---
