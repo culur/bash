@@ -215,6 +215,9 @@ Temporarily toggle the Git remote `origin` up or down so your repository behaves
   - `git r` or `git r status`: Display current status of `origin` (`[UP]` or `[DOWN]`) along with its URL (Default).
   - `git r down`: Disable the active `origin` remote and detach upstream branch tracking.
   - `git r up`: Re-enable the disabled `origin` remote and restore upstream branch tracking.
+  - `git r push [args]`: Temporarily enable `origin`, execute `git push [args]`, and disable `origin` upon success.
+  - `git r pull [args]`: Temporarily enable `origin`, execute `git pull [args]`, and disable `origin` upon success.
+  - `git r fetch [args]`: Temporarily enable `origin`, execute `git fetch [args]`, and disable `origin` upon success.
   - `-h, --help`: Show help message.
 
 - **How it works:**
@@ -223,6 +226,7 @@ Temporarily toggle the Git remote `origin` up or down so your repository behaves
   3. **Upstream Branch Tracking Preservation:** Stashes branch tracking mappings (`branch.<name>.remote` -> `branch.<name>.disabled-remote`) so `git status` and `git push` treat branches as clean local branches without remote destinations.
   4. **Conflict Diagnostic & Safe Abort:** If a new `origin` is added while the original is disabled (e.g. via GUI/IDE action), `git r up` safely aborts without altering any configuration, logging a detailed diagnostic report with old vs new URLs, tracked branches, and existing remote refs.
   5. **Zero History Loss:** Does not delete cached remote tracking refs or commit objects, keeping them safe from garbage collection and avoiding any need to re-fetch from the network upon re-enabling.
+  6. **Safe Remote Operations (Push / Pull / Fetch):** Wraps remote operations with automated `up` and `down`. If the remote operation fails (e.g. non-fast-forward rejection, merge conflicts, network error), execution halts immediately at that step, keeping error logs visible and leaving `origin` active (`UP`) for debugging and conflict resolution.
 
 - **Examples:**
 
@@ -235,6 +239,14 @@ Temporarily toggle the Git remote `origin` up or down so your repository behaves
 
   # Re-enable origin remote and restore tracking
   git r up
+
+  # Push changes to origin (temporarily enables origin, runs push, then disables origin)
+  git r push
+  git r push -f origin main
+
+  # Pull or fetch changes from origin
+  git r pull
+  git r fetch
   ```
 
 ---

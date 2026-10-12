@@ -71,6 +71,9 @@ USAGE:
 COMMANDS:
   down                  Disable 'origin' remote (switch to local-only mode).
   up                    Re-enable 'origin' remote and restore tracking branches.
+  push [args]           Temporarily enable 'origin', run 'git push [args]', then disable 'origin'.
+  pull [args]           Temporarily enable 'origin', run 'git pull [args]', then disable 'origin'.
+  fetch [args]          Temporarily enable 'origin', run 'git fetch [args]', then disable 'origin'.
   status                Display current status of 'origin' (Default).
 
 OPTIONS:
@@ -79,6 +82,10 @@ OPTIONS:
 EXAMPLES:
   git r down            Disable 'origin' remote.
   git r up              Re-enable 'origin' remote.
+  git r push            Push to origin (up -> push -> down).
+  git r push -f         Force push to origin (up -> push -> down).
+  git r pull            Pull from origin (up -> pull -> down).
+  git r fetch           Fetch from origin (up -> fetch -> down).
   git r                 Show status of 'origin' (UP / DOWN).
 EOF
 }
@@ -354,9 +361,31 @@ cmd_up() {
   fi
 }
 
+# Temporarily bring remote UP, run a git operation, then bring remote DOWN
+run_remote_op() {
+  local op="$1"
+  shift
+  cmd_up
+  git "$op" "$@"
+  cmd_down
+}
+
+cmd_push() {
+  run_remote_op "push" "$@"
+}
+
+cmd_pull() {
+  run_remote_op "pull" "$@"
+}
+
+cmd_fetch() {
+  run_remote_op "fetch" "$@"
+}
+
 # Main entry point
 main() {
   local action="status"
+  local -a extra_args=()
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -372,6 +401,24 @@ main() {
         action="down"
         shift
         ;;
+      push)
+        action="push"
+        shift
+        extra_args=("$@")
+        break
+        ;;
+      pull)
+        action="pull"
+        shift
+        extra_args=("$@")
+        break
+        ;;
+      fetch)
+        action="fetch"
+        shift
+        extra_args=("$@")
+        break
+        ;;
       status)
         action="status"
         shift
@@ -382,7 +429,7 @@ main() {
         ;;
       *)
         print_error "Unexpected argument '$1'."
-        print_error "git-r strictly supports only 'origin'. Subcommands: up, down, status."
+        print_error "git-r strictly supports only 'origin'. Subcommands: up, down, push, pull, fetch, status."
         show_help
         exit 1
         ;;
@@ -401,6 +448,15 @@ main() {
       ;;
     up)
       cmd_up
+      ;;
+    push)
+      cmd_push "${extra_args[@]}"
+      ;;
+    pull)
+      cmd_pull "${extra_args[@]}"
+      ;;
+    fetch)
+      cmd_fetch "${extra_args[@]}"
       ;;
   esac
 }
